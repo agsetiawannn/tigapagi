@@ -22,26 +22,11 @@ if (isset($_POST['add_client'])) {
         $error_msg = "Email sudah digunakan klien lain.";
     } else {
         // 🔥 Perbaikan Keamanan: Gunakan Prepared Statement untuk INSERT (opsional tapi disarankan)
-        $conn->query("INSERT INTO clients (name, email, company, status) VALUES ('$name', '$email', '$company', 'active')");
+        $conn->query("INSERT INTO clients (name, email, status) VALUES ('$name', '$email', 'active')");
         $success_msg = "Klien berhasil ditambahkan.";
     }
 }
 
-// === Tambah Proyek Baru ===
-if (isset($_POST['add_progress'])) {
-    $client_id = intval($_POST['client_id']);
-    $title = mysqli_real_escape_string($conn, $_POST['title']);
-    $description = mysqli_real_escape_string($conn, $_POST['description']);
-    $status = mysqli_real_escape_string($conn, $_POST['status']);
-
-    if ($client_id > 0) {
-        // 🔥 Perbaikan Keamanan: Gunakan Prepared Statement untuk INSERT (opsional tapi disarankan)
-        $conn->query("INSERT INTO progress (client_id, title, description, status) VALUES ($client_id, '$title', '$description', '$status')");
-        $success_msg = "Proyek berhasil ditambahkan.";
-    } else {
-        $error_msg = "Klien belum dipilih.";
-    }
-}
 
 // === HAPUS KLIEN BARU ===
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
@@ -110,27 +95,9 @@ $progress = $conn->query("
 <form method="post">
     <input type="text" name="name" placeholder="Nama Klien" required>
     <input type="email" name="email" placeholder="Email Klien" required>
-    <input type="text" name="company" placeholder="Perusahaan">
     <button type="submit" name="add_client">Tambah Klien</button>
 </form>
 
-<h3>Tambah Proyek Baru</h3>
-<form method="post">
-    <select name="client_id" required>
-        <option value="">-- Pilih Klien --</option>
-        <?php while ($c = $active_clients->fetch_assoc()): ?>
-            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?> (<?= htmlspecialchars($c['company']) ?>)</option>
-        <?php endwhile; ?>
-    </select>
-    <input type="text" name="title" placeholder="Judul Proyek" required>
-    <textarea name="description" placeholder="Deskripsi Proyek" rows="3" required></textarea>
-    <select name="status">
-        <option value="pending">Pending</option>
-        <option value="ongoing">Ongoing</option>
-        <option value="completed">Completed</option>
-    </select>
-    <button type="submit" name="add_progress">Tambah Proyek</button>
-</form>
 
 <h3>Daftar Klien</h3>
 <table>
@@ -147,7 +114,6 @@ $progress = $conn->query("
     <td><?= $row['id'] ?></td>
     <td><?= htmlspecialchars($row['name']) ?></td>
     <td><?= htmlspecialchars($row['email']) ?></td>
-    <td><?= htmlspecialchars($row['company']) ?></td>
     <td><?= htmlspecialchars($row['status']) ?></td>
     <td>
         <a class="btn btn-edit" href="save_progress.php?client_id=<?= $row['id'] ?>">Edit Progress</a>
