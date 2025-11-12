@@ -153,8 +153,8 @@ $progress = $conn->query("
         <a class="btn btn-edit" href="save_progress.php?client_id=<?= $row['id'] ?>">Edit Progress</a>
         
         <a class="btn btn-delete" 
-           href="?action=delete&id=<?= $row['id'] ?>"
-           onclick="return confirm('Apakah Anda yakin ingin menghapus klien ID <?= $row['id'] ?> dan semua data terkait?')"
+        href="?action=delete&id=<?= $row['id'] ?>"
+        onclick="return confirm('Apakah Anda yakin ingin menghapus klien ID <?= $row['id'] ?> dan semua data terkait?')"
         >Hapus</a>
     </td>
 </tr>
