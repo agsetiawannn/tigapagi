@@ -174,7 +174,7 @@ button:hover { background:#1e7e34; }
         <h3>Sprint Week</h3>
         <table>
             <tr><th>Tanggal</th><th>Minggu</th><th>Status</th></tr>
-            <?php for ($i=0;$i<3;$i++):
+            <?php for ($i=0;$i<4;$i++):
                 $saved = $sprint_data[$i] ?? ['date'=>'','status'=>'pending'];
             ?>
             <tr>

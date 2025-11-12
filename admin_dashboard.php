@@ -107,7 +107,6 @@ $progress = $conn->query("
     <th>Email</th>
     <th>Perusahaan</th>
     <th>Status</th>
-    <th>Aksi</th>
 </tr>
 <?php while ($row = $clients->fetch_assoc()): ?>
 <tr>
