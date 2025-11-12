@@ -23,7 +23,8 @@ $client = $res->fetch_assoc();
 if (!$client) die("Data klien tidak ditemukan.");
 
 // --- Ambil Progress Lama (jika ada) ---
-$stmt2 = $conn->prepare("SELECT onboard, presprint, sprint FROM client_progress WHERE client_id = ?");
+// Perbaikan: Menambahkan client_view di SELECT query
+$stmt2 = $conn->prepare("SELECT onboard, presprint, sprint, client_view FROM client_progress WHERE client_id = ?");
 $stmt2->bind_param("i", $client_id);
 $stmt2->execute();
 $res2 = $stmt2->get_result();
@@ -32,6 +33,9 @@ $progress_data = $res2->fetch_assoc();
 $onboard_data   = $progress_data ? json_decode($progress_data['onboard'], true)   : [];
 $presprint_data = $progress_data ? json_decode($progress_data['presprint'], true) : [];
 $sprint_data    = $progress_data ? json_decode($progress_data['sprint'], true)    : [];
+// Nilai view saat ini di database (tidak digunakan untuk tampilan admin, hanya referensi)
+$db_client_view = $progress_data['client_view'] ?? 'onboard'; 
+
 
 $success = "";
 
@@ -41,27 +45,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $presprint = json_encode($_POST['presprint'] ?? []);
     $sprint    = json_encode($_POST['sprint'] ?? []);
 
+    // 🔥 PERBAIKAN: Ambil nilai client_view dari hidden input POST
+    // Jika admin sedang di view=all, maka kita tidak menyimpan "all" ke klien, kita simpan yang terakhir.
+    $client_view = ($_POST['client_view'] == 'all') ? $db_client_view : $_POST['client_view'];
+    
+    // Fallback jika 'view' tidak terdefinisi
+    if(empty($client_view)) $client_view = 'onboard';
+
+
     $stmt3 = $conn->prepare("SELECT id FROM client_progress WHERE client_id = ?");
     $stmt3->bind_param("i", $client_id);
     $stmt3->execute();
     $exists = $stmt3->get_result();
 
     if ($exists->num_rows > 0) {
-        $stmt4 = $conn->prepare("UPDATE client_progress SET onboard=?, presprint=?, sprint=?, updated_at=NOW() WHERE client_id=?");
-        $stmt4->bind_param("sssi", $onboard, $presprint, $sprint, $client_id);
+        $stmt4 = $conn->prepare("UPDATE client_progress 
+                                SET onboard=?, presprint=?, sprint=?, client_view=?, updated_at=NOW() 
+                                WHERE client_id=?");
+        // URUTAN HARUS SAMA: s s s s i (4 string, 1 integer)
+        $stmt4->bind_param("ssssi", $onboard, $presprint, $sprint, $client_view, $client_id); 
         $stmt4->execute();
     } else {
-        $stmt5 = $conn->prepare("INSERT INTO client_progress (client_id, onboard, presprint, sprint) VALUES (?, ?, ?, ?)");
-        $stmt5->bind_param("isss", $client_id, $onboard, $presprint, $sprint);
+        $stmt5 = $conn->prepare("INSERT INTO client_progress (client_id, onboard, presprint, sprint, client_view) 
+                                VALUES (?, ?, ?, ?, ?)");
+        // URUTAN HARUS SAMA: i s s s s (1 integer, 4 string)
+        $stmt5->bind_param("issss", $client_id, $onboard, $presprint, $sprint, $client_view);
         $stmt5->execute();
     }
 
-    header("Location: ".$_SERVER['PHP_SELF']."?client_id=".$client_id);
+    // Tentukan view untuk redirect agar filter tetap terpilih
+    $redirect_view = $_GET['view'] ?? 'all'; 
+
+    $success = "Progress berhasil disimpan.";
+    header("Location: ".$_SERVER['PHP_SELF']."?client_id=".$client_id."&view=".$redirect_view."&saved=1");
     exit();
 }
 
 // --- Filter tampilan ---
+// Menambahkan pesan success ke view
 $view = $_GET['view'] ?? 'all';
+$success_msg = isset($_GET['saved']) ? '<div style="background:#d1e7dd; color:#0f5132; padding:10px; border-radius:4px; margin-bottom:10px;">Progress berhasil disimpan.</div>' : '';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -87,8 +110,8 @@ button:hover { background:#1e7e34; }
 <div class="container">
     <h2>Progress Klien: <?= htmlspecialchars($client['name']) ?></h2>
     <a href="admin_dashboard.php">← Kembali ke Dashboard</a>
-
-    <div class="filter">
+    
+    <?= $success_msg ?> <div class="filter">
         <a href="?client_id=<?= $client_id ?>&view=all" class="<?= $view=='all'?'active':'' ?>">Semua</a>
         <a href="?client_id=<?= $client_id ?>&view=onboard" class="<?= $view=='onboard'?'active':'' ?>">On Board</a>
         <a href="?client_id=<?= $client_id ?>&view=presprint" class="<?= $view=='presprint'?'active':'' ?>">Pre-Sprint</a>
@@ -96,6 +119,8 @@ button:hover { background:#1e7e34; }
     </div>
 
     <form method="post">
+        
+        <input type="hidden" name="client_view" value="<?= htmlspecialchars($_GET['view'] ?? 'onboard') ?>">
 
         <?php if ($view=='all' || $view=='onboard'): ?>
         <h3>On Board</h3>
