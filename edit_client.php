@@ -17,11 +17,10 @@ $success_msg = "";
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_client'])) {
     $name = mysqli_real_escape_string($conn, $_POST['name']);
     $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $company = mysqli_real_escape_string($conn, $_POST['company']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
 
     $sql = "UPDATE clients 
-            SET name = '$name', email = '$email', company = '$company', status = '$status'
+            SET name = '$name', email = '$email', status = '$status'
             WHERE id = $client_id";
 
     if ($conn->query($sql)) {
@@ -62,9 +61,6 @@ if ($client_id > 0) {
     
     <label>Email Klien:</label><br>
     <input type="email" name="email" value="<?= htmlspecialchars($client['email']) ?>" required style="width: 300px;"><br><br>
-    
-    <label>Perusahaan:</label><br>
-    <input type="text" name="company" value="<?= htmlspecialchars($client['company']) ?>" style="width: 300px;"><br><br>
 
     <label>Status Akun:</label><br>
     <select name="status">
