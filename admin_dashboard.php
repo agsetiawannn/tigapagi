@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db.php';
+include 'db.php'; // Mengasumsikan $conn sudah terkoneksi dengan benar
 
 // Validasi admin login
 if (!isset($_SESSION['admin'])) {
@@ -11,36 +11,59 @@ if (!isset($_SESSION['admin'])) {
 $error_msg = "";
 $success_msg = "";
 
-// === Tambah Klien Baru ===
+// === Tambah Klien Baru (Ditingkatkan Keamanan) ===
 if (isset($_POST['add_client'])) {
-    $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $company = mysqli_real_escape_string($conn, $_POST['company']);
+    $name = trim($_POST['name']);
+    $email = trim($_POST['email']);
     
-    $exists = $conn->query("SELECT id FROM clients WHERE email='$email'");
-    if ($exists->num_rows > 0) {
-        $error_msg = "Email sudah digunakan klien lain.";
+    // Validasi input dasar
+    if (empty($name) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error_msg = "Nama atau format Email tidak valid.";
     } else {
-        // 🔥 Perbaikan Keamanan: Gunakan Prepared Statement untuk INSERT (opsional tapi disarankan)
-        $conn->query("INSERT INTO clients (name, email, status) VALUES ('$name', '$email', 'active')");
-        $success_msg = "Klien berhasil ditambahkan.";
+        
+        // 1. Cek duplikasi menggunakan Prepared Statement
+        $stmt_check = $conn->prepare("SELECT id FROM clients WHERE email = ?");
+        $stmt_check->bind_param("s", $email);
+        $stmt_check->execute();
+        $exists = $stmt_check->get_result();
+        
+        if ($exists->num_rows > 0) {
+            $error_msg = "Email sudah digunakan klien lain.";
+        } else {
+            // 2. Insert Klien baru menggunakan Prepared Statement (Sangat Direkomendasikan)
+            $stmt_insert = $conn->prepare("INSERT INTO clients (name, email, status) VALUES (?, ?, 'active')");
+            $stmt_insert->bind_param("ss", $name, $email);
+            
+            if ($stmt_insert->execute()) {
+                $success_msg = "Klien berhasil ditambahkan.";
+            } else {
+                $error_msg = "Gagal menambahkan klien: " . $stmt_insert->error;
+            }
+            $stmt_insert->close();
+        }
+        $stmt_check->close();
     }
 }
 
 
-// === HAPUS KLIEN BARU ===
+// === HAPUS KLIEN BARU (Menggunakan Prepared Statement) ===
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $delete_id = intval($_GET['id']);
     
     if ($delete_id > 0) {
-        // 🚨 Peringatan: Hapus data terkait di tabel lain (progress & client_progress)
-        $conn->query("DELETE FROM progress WHERE client_id = $delete_id");
-        $conn->query("DELETE FROM client_progress WHERE client_id = $delete_id");
+        // 🔥 Perbaikan Keamanan: Gunakan Prepared Statement untuk menghapus data
+        
+        // Hapus data terkait di tabel lain (progress & client_progress)
+        $conn->prepare("DELETE FROM progress WHERE client_id = ?")->execute([$delete_id]);
+        $conn->prepare("DELETE FROM client_progress WHERE client_id = ?")->execute([$delete_id]);
         
         // Hapus klien utama
-        $conn->query("DELETE FROM clients WHERE id = $delete_id");
+        $stmt_delete = $conn->prepare("DELETE FROM clients WHERE id = ?");
+        $stmt_delete->bind_param("i", $delete_id);
+        $stmt_delete->execute();
         
         $success_msg = "Klien (ID: $delete_id) dan semua data proyek terkait berhasil dihapus.";
+        $stmt_delete->close();
         
         // Redirect untuk membersihkan parameter GET dari URL
         header("Location: admin_dashboard.php");
@@ -51,9 +74,13 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
 }
 
 
-// === Ambil Data ===
-$clients = $conn->query("SELECT id, name, email, company, status FROM clients ORDER BY name ASC");
-$active_clients = $conn->query("SELECT id, name, company FROM clients WHERE status='active' ORDER BY name ASC");
+// === Ambil Data (Koreksi Syntax SQL) ===
+$clients = $conn->query("SELECT id, name, email, status FROM clients ORDER BY name ASC");
+
+// KOREKSI SINTAKS SQL: Menghapus koma setelah 'name'
+$active_clients = $conn->query("SELECT id, name FROM clients WHERE status='active' ORDER BY name ASC");
+
+// Query progress tidak memiliki masalah sintaks
 $progress = $conn->query("
     SELECT p.id, c.name AS client_name, p.title, p.description, p.status
     FROM progress p
@@ -105,9 +132,8 @@ $progress = $conn->query("
     <th>ID</th>
     <th>Nama</th>
     <th>Email</th>
-    <th>Perusahaan</th>
     <th>Status</th>
-</tr>
+    <th>Aksi</th> </tr>
 <?php while ($row = $clients->fetch_assoc()): ?>
 <tr>
     <td><?= $row['id'] ?></td>
