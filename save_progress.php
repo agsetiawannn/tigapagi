@@ -85,10 +85,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ------------------------------------------
     else {
         
-        $onboard   = json_encode($_POST['onboard'] ?? []);
-        $presprint = json_encode($_POST['presprint'] ?? []);
-        $sprint    = json_encode($_POST['sprint'] ?? []);
-        $client_view = $_POST['client_view'] ?? 'none'; 
+        // --- Preserve existing data for phases not present in the POST ---
+        // If the form does not submit a phase (because the UI only showed one view),
+        // we must not overwrite the stored JSON with an empty array. Merge behavior:
+        $existing_onboard   = $progress_data['onboard']   ?? json_encode([]);
+        $existing_presprint = $progress_data['presprint'] ?? json_encode([]);
+        $existing_sprint    = $progress_data['sprint']    ?? json_encode([]);
+
+        $onboard   = isset($_POST['onboard'])   ? json_encode($_POST['onboard'])   : $existing_onboard;
+        $presprint = isset($_POST['presprint']) ? json_encode($_POST['presprint']) : $existing_presprint;
+        $sprint    = isset($_POST['sprint'])    ? json_encode($_POST['sprint'])    : $existing_sprint;
+        $client_view = $_POST['client_view'] ?? $progress_data['client_view'] ?? 'none'; 
         
         $stmt3 = $conn->prepare("SELECT id FROM client_progress WHERE client_id = ?");
         $stmt3->bind_param("i", $client_id);
